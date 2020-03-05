@@ -30,3 +30,10 @@ function write_block(io, data, rn, trim_data)
         write(io, data[i][4][ind], "\n")
     end
 end
+
+
+"""
+    Count the number of Ambiguous bases in a sequence
+    i.e. count number of N's
+"""
+count_n(seq) = count(isambiguous, seq)
