@@ -7,6 +7,6 @@ using Test
     # Write your own tests here.
 
     @test SequenceTrimmer.count_n(dna"ACGT")  == 0
-    @test SequenceTrimmer.count_n(dna"ACGTM") == 1
+    @test SequenceTrimmer.count_n(dna"ACGTN") == 1
 
 end
