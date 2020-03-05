@@ -1,5 +1,4 @@
 module SequenceTrimmer
 
-greet() = print("Hello World!")
-
+include("trimming.jl")
 end # module
