@@ -104,7 +104,7 @@ function estimate_libtype(fq1, fq2, num_reads=5, rl = 50, sl=0)
 
         nr += 1
         (nr <= sl) && continue
-
+        
         seq1 = LongDNASeq(read1)
         seq2 = LongDNASeq(read2)
         ind = align_rc(seq1, seq2)
@@ -117,8 +117,6 @@ function estimate_libtype(fq1, fq2, num_reads=5, rl = 50, sl=0)
             add_pwm!(PWM_L, adapter1)
             add_pwm!(PWM_R, adapter2)
         end
-
-        
     end
 
     close(f1)
@@ -185,8 +183,8 @@ function info_content(PWM)
     ts = PWM[5, :]
     en = 3.0./(2*ts*log(2))
     F = PWM[1:4, :]./ts'
-    H = -sum(F.*log2.(F), 1)
-    R = log2(4) - (H + en')
+    H = -sum(F.*log2.(F), dims=1)
+    R = log2(4) .- (H + en')
     sum(filter(r -> !isnan(r) && !isinf(r), R))
 end
 
@@ -222,7 +220,8 @@ end
 """
 function rcmm(seqA, seqB)
     rb = reverse_complement(seqB)
-    count(Mismatch, seqA, rb) - count(Ambiguous, seqA, rb)
+    mm = mismatches(seqA, rb) - count(isambiguous, seqA, rb)
+    max(0, mm)
 end
 
 
@@ -257,8 +256,8 @@ function trim_reads(readR1, readR2, L_match, R_match, align_length, max_distance
         if !isempty(trim_ind)
             adaptind = (trim_ind.stop + 1):length(seq1)
             
-            mm1 = count(Mismatch, seq1[adaptind], L_match)
-            mm2 = count(Mismatch, seq1[adaptind], R_match)
+            mm1 = mismatches(seq1[adaptind], L_match)
+            mm2 = mismatches(seq1[adaptind], R_match)
 
             compare_length = min(length(adaptind), length(L_match))
             if (mm1 + mm2)/(2*compare_length) < mismatch_rate
@@ -277,10 +276,10 @@ function trim_fastq_threads(fq_R1, fq_R2, align_length=20, max_distance=1, misma
 
 
     # Set output
-    outfile_R1 = replace(fq_R1, ".fastq.gz", ".trim.fastq.gz")
-    outfile_R2 = replace(fq_R2, ".fastq.gz", ".trim.fastq.gz")
-    outfile_R1 = replace(outfile_R1, ".fq.gz", ".trim.fq.gz")
-    outfile_R2 = replace(outfile_R2, ".fq.gz", ".trim.fq.gz")
+    outfile_R1 = replace(fq_R1, ".fastq.gz"   =>  ".trim.fastq.gz")
+    outfile_R2 = replace(fq_R2, ".fastq.gz"   =>  ".trim.fastq.gz")
+    outfile_R1 = replace(outfile_R1, ".fq.gz" => ".trim.fq.gz")
+    outfile_R2 = replace(outfile_R2, ".fq.gz" => ".trim.fq.gz")
     
     (fq_R1 == outfile_R1) && error("In/Out Equal: $fq_R1 $outfile_R1")
     (fq_R2 == outfile_R2) && error("In/Out Equal: $fq_R2 $outfile_R2")
@@ -324,7 +323,7 @@ function trim_fastq_threads(fq_R1, fq_R2, align_length=20, max_distance=1, misma
     println("[TFR]\tL_match               :\t", L_match)
     println("[TFR]\tR_match               :\t", R_match)
     println("[TFR]\tWriting               :\t$outfile_R1, $outfile_R2")
-    flush(STDOUT) ### Flushes IO so can read the output parameters whilst trimming
+    flush(stdout) ### Flushes IO so can read the output parameters whilst trimming
     starttime = time()
 
 
@@ -336,11 +335,11 @@ function trim_fastq_threads(fq_R1, fq_R2, align_length=20, max_distance=1, misma
     writer_r2 = open(outfile_R2, "w") |> GzipCompressorStream
    
     #### Datastructure to read fastq files and trim them
-    datablock_R1 = [Vector{String}(4) for i = 1:blocksize]
-    datablock_R2 = [Vector{String}(4) for i = 1:blocksize]
+    datablock_R1 = [Vector{String}(undef, 4) for i = 1:blocksize]
+    datablock_R2 = [Vector{String}(undef, 4) for i = 1:blocksize]
 
     ### Trimming stats
-    temp_trim_data = Vector{Tuple{Int, Int}}(blocksize)
+    temp_trim_data = Vector{Tuple{Int, Int}}(undef, blocksize)
     trim_data  = zeros(Int, 2, blocksize)
     trim_stats = counter(Tuple{Int, Int})
 
@@ -355,7 +354,8 @@ function trim_fastq_threads(fq_R1, fq_R2, align_length=20, max_distance=1, misma
         (rn1 == 0) && break
 
         ### Threaded trimming of the block
-        Threads.@threads for i = 1:rn1
+        #Threads.@threads
+        for i = 1:rn1
             trim_data[1, i], trim_data[2, i] = trim_reads(datablock_R1[i], datablock_R2[i], L_match, R_match, align_length, max_distance, mismatch_rate, max_n)
         end
 
